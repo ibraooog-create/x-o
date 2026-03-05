@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>X-O | دقائق وثواني</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --cell-bg: #16213e;
+            --x-color: #e74c3c;
+            --o-color: #4eeff9;
+            --win-line: #f1c40f;
+            --accent: #2ecc71;
+        }
+        * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
+        
+        body {
+            margin: 0; background: var(--bg); color: white;
+            font-family: system-ui, sans-serif;
+            display: flex; align-items: center; justify-content: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        .main-layout {
+            display: flex;
+            flex-direction: row-reverse;
+            align-items: center;
+            gap: 40px;
+            padding: 20px;
+            width: 90%;
+            max-width: 900px;
+        }
+
+        /* منطقة اللعب */
+        .game-area { position: relative; }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 110px);
+            grid-template-rows: repeat(3, 110px);
+            gap: 15px;
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        }
+
+        .cell {
+            background: var(--cell-bg);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .cell.x { color: var(--x-color); text-shadow: 0 0 15px var(--x-color); }
+        .cell.o { color: var(--o-color); text-shadow: 0 0 15px var(--o-color); }
+
+        /* لوحة التحكم والوقت */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 220px;
+        }
+
+        .timer-card {
+            background: linear-gradient(145deg, #16213e, #0f3460);
+            padding: 25px;
+            border-radius: 20px;
+            border: 2px solid #1f4068;
+            text-align: center;
+        }
+
+        .timer-label { font-size: 0.8rem; color: #8892b0; text-transform: uppercase; letter-spacing: 1px; }
+        .timer-value { 
+            font-size: 3rem; 
+            font-weight: 800; 
+            color: var(--accent); 
+            font-family: 'Courier New', Courier, monospace; /* خط رقمي */
+            margin-top: 5px;
+        }
+
+        .status-text { font-size: 1.4rem; text-align: center; font-weight: bold; }
+
+        button {
+            padding: 18px; border: none; border-radius: 15px;
+            font-weight: bold; cursor: pointer; font-size: 1.2rem;
+            background: var(--accent); color: white;
+            box-shadow: 0 6px 0 #1b8a4d;
+            transition: 0.1s;
+        }
+        button:active { transform: translateY(3px); box-shadow: 0 3px 0 #1b8a4d; }
+
+        #winning-line {
+            position: absolute; background-color: var(--win-line);
+            z-index: 10; display: none; border-radius: 10px;
+            box-shadow: 0 0 20px var(--win-line); pointer-events: none;
+            height: 10px; transform-origin: left center; transition: width 0.4s ease-out;
+        }
+
+        #win-msg {
+            position: fixed; top: 10%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            background: rgba(0,0,0,0.9); padding: 15px 40px;
+            border-radius: 50px; font-size: 2rem; z-index: 100; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid var(--win-line);
+        }
+        #win-msg.show { transform: translate(-50%, -50%) scale(1); }
+
+        @media (max-width: 700px) {
+            .main-layout { flex-direction: column; gap: 30px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="win-msg"></div>
+
+    <div class="main-layout">
+        <div class="game-area">
+            <div id="winning-line"></div>
+            <div class="board" id="board">
+                <div class="cell" id="c0" onclick="makeMove(0)"></div>
+                <div class="cell" id="c1" onclick="makeMove(1)"></div>
+                <div class="cell" id="c2" onclick="makeMove(2)"></div>
+                <div class="cell" id="c3" onclick="makeMove(3)"></div>
+                <div class="cell" id="c4" onclick="makeMove(4)"></div>
+                <div class="cell" id="c5" onclick="makeMove(5)"></div>
+                <div class="cell" id="c6" onclick="makeMove(6)"></div>
+                <div class="cell" id="c7" onclick="makeMove(7)"></div>
+                <div class="cell" id="c8" onclick="makeMove(8)"></div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="status-text">
+                دور: <span id="turn" style="color:var(--x-color)">X</span>
+            </div>
+            
+            <div class="timer-card">
+                <div class="timer-label">مستغرق الوقت</div>
+                <div class="timer-value" id="timer">00:00</div>
+            </div>
+
+            <button onclick="resetGame()">إعادة اللعب 🔄</button>
+        </div>
+    </div>
+
+    <script>
+        let board = ["", "", "", "", "", "", "", "", ""];
+        let currentPlayer = "X";
+        let gameActive = true;
+        let totalSeconds = 0;
+        let timerInterval;
+
+        const winConditions = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            totalSeconds = 0;
+            document.getElementById('timer').innerText = "00:00";
+            timerInterval = setInterval(() => {
+                if(gameActive) {
+                    totalSeconds++;
+                    document.getElementById('timer').innerText = formatTime(totalSeconds);
+                }
+            }, 1000);
+        }
+
+        function playSound(freq, type, duration) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function makeMove(i) {
+            if (board[i] !== "" || !gameActive) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            board[i] = currentPlayer;
+            const cell = document.getElementById(`c${i}`);
+            cell.innerText = currentPlayer;
+            cell.classList.add(currentPlayer.toLowerCase());
+            playSound(currentPlayer === "X" ? 440 : 330, 'sine', 0.2);
+
+            const winCombo = checkWin();
+            if (winCombo) {
+                drawWinLine(winCombo);
+                endGame(false);
+            } else if (!board.includes("")) {
+                endGame(true);
+            } else {
+                currentPlayer = currentPlayer === "X" ? "O" : "X";
+                document.getElementById('turn').innerText = currentPlayer;
+                document.getElementById('turn').style.color = currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
+            }
+        }
+
+        function checkWin() { return winConditions.find(combo => combo.every(idx => board[idx] === currentPlayer)); }
+
+        function drawWinLine(combo) {
+            const line = document.getElementById('winning-line');
+            const cStart = document.getElementById(`c${combo[0]}`).getBoundingClientRect();
+            const cEnd = document.getElementById(`c${combo[2]}`).getBoundingClientRect();
+            const area = document.querySelector('.game-area').getBoundingClientRect();
+            
+            const x1 = (cStart.left + cStart.width/2) - area.left;
+            const y1 = (cStart.top + cStart.height/2) - area.top;
+            const x2 = (cEnd.left + cEnd.width/2) - area.left;
+            const y2 = (cEnd.top + cEnd.height/2) - area.top;
+
+            line.style.width = "0px";
+            line.style.left = x1 + "px";
+            line.style.top = y1 + "px";
+            line.style.transform = `rotate(${Math.atan2(y2-y1, x2-x1)*180/Math.PI}deg)`;
+            line.style.display = "block";
+            setTimeout(() => { line.style.width = Math.hypot(x2-x1, y2-y1) + "px"; }, 50);
+        }
+
+        function endGame(draw) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            const msg = document.getElementById('win-msg');
+            msg.innerText = draw ? "تعادل! 🤝" : `فاز اللاعب ${currentPlayer}! 🎉`;
+            msg.classList.add('show');
+            draw ? playSound(200, 'sawtooth', 0.4) : playSound(880, 'sine', 0.5);
+        }
+
+        function resetGame() {
+            board = ["", "", "", "", "", "", "", "", ""];
+            currentPlayer = "X";
+            gameActive = true;
+            document.getElementById('winning-line').style.display = "none";
+            document.getElementById('win-msg').classList.remove('show');
+            document.querySelectorAll('.cell').forEach(c => { c.innerText = ""; c.classList.remove('x', 'o'); });
+            document.getElementById('turn').innerText = "X";
+            document.getElementById('turn').style.color = "var(--x-color)";
+            startTimer();
+        }
+
+        startTimer();
+    </script>
+</body>
+</html>
