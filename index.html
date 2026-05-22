@@ -205,6 +205,7 @@
     <script>
         let board = Array(9).fill("");
         let currentPlayer = "X";
+        let startingPlayer = "X"; // المتغير المسؤول عن تحديد من يبدأ الجولة الحالية
         let gameActive = false;
         let gameMode = 'pvp'; 
         let playerNames = { X: "اللاعب X", O: "اللاعب O" };
@@ -234,6 +235,9 @@
             // تحديث الواجهة بالأسماء الجديدة
             document.getElementById('display-nameX').innerText = playerNames.X;
             document.getElementById('display-nameO').innerText = playerNames.O;
+            
+            currentPlayer = "X";
+            startingPlayer = "X";
             updateTurnUI();
 
             document.getElementById('start-screen').style.opacity = '0';
@@ -361,7 +365,11 @@
 
         function resetGame() {
             board = Array(9).fill("");
-            currentPlayer = "X";
+            
+            // تغيير اللاعب البادئ للجولة الجديدة بشكل دوري
+            startingPlayer = startingPlayer === "X" ? "O" : "X";
+            currentPlayer = startingPlayer;
+
             gameActive = true;
             document.getElementById('winning-line').style.display = "none";
             document.getElementById('win-msg').classList.remove('show');
@@ -369,6 +377,11 @@
             document.getElementById('reset-btn').classList.remove('active');
             updateTurnUI();
             startMoveTimer();
+
+            // إذا كان الدور على الكمبيوتر ليبدأ الجولة الجديدة
+            if (gameMode === 'ai' && currentPlayer === 'O' && gameActive) {
+                setTimeout(autoPlay, 600);
+            }
         }
 
         function goToStart() {
@@ -376,6 +389,7 @@
             clearInterval(moveTimer);
             board = Array(9).fill("");
             currentPlayer = "X";
+            startingPlayer = "X";
             gameActive = false;
             totalSeconds = 0;
             scores = { X: 0, O: 0 };
